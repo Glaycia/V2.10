@@ -2,6 +2,7 @@ from casadi import numpy as np
 from casadi import *
 import casadi
 
+import PrintUtil
 from ArmDynamics import Arm, Prototype
 import ArmKinematics
 from Integration import rk4, euler
@@ -28,9 +29,9 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casa
     J2dot_target = qFinal[3, 0]
 
     X = solver.variable(4, N + 1) #Arm State
-    for k in range(N + 1):
-        solver.set_initial(X[0, k], J1_init + k / N * (J1_target - J1_init))
-        solver.set_initial(X[1, k], J2_init + k / N * (J2_target - J2_init))
+    # for k in range(N + 1):
+    #     solver.set_initial(X[0, k], J1_init + k / (N+1) * (J1_target - J1_init))
+    #     solver.set_initial(X[1, k], J2_init + k / (N+1) * (J2_target - J2_init))
     U = solver.variable(2, N) #Torques
     T = solver.variable(1) #Total Time
 
@@ -58,14 +59,14 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casa
     solver.subject_to(solver.bounded(-u2_max, U[1, :], u2_max))
 
     #Time is not negative
-    solver.subject_to(T > 0.01)
+    solver.subject_to(T > 0)
     dT = T/N
     for k in range(N):
         solver.subject_to(X[:, k+1] == euler(Arm.ArmDynamics, X[:, k], U[:, k], dT)) #Dynamics
     #Minimize time
     solver.minimize(T)
 
-    return solver, X, U
+    return solver, X, U, T
 
 
 if __name__ == "__main__":
@@ -77,9 +78,22 @@ if __name__ == "__main__":
     qInit[0, 0] = 0.5
     qInit[1, 0] = 0
     qFinal = np.zeros((4, 1))
-    qFinal[0, 0] = 1
-    qFinal[1, 0] = 0
+    qFinal[0, 0] = 2
+    qFinal[1, 0] = -3
     
-    solver, X, U = DivorcedArm(PrototypeArm, qInit, qFinal, N)
+    solver, X, U, T = DivorcedArm(PrototypeArm, qInit, qFinal, N)
     solution = solver.solve()
     resultant_states = solution.value(X)
+    dT = solution.value(T)/N
+
+    for i in range(N + 1):
+        q = resultant_states[0:2, i]
+        PrintUtil.printArm(q, PrototypeArm.proximal.length, PrototypeArm.proximal.length, i/(N+1))
+        # j1x = sin(q[0]) * PrototypeArm.proximal.length
+        # j1y = cos(q[1]) * PrototypeArm.proximal.length
+        # print("(", j1x, ", ", j1y, ")")
+        # x = ArmKinematics.forwardKinematics(q, PrototypeArm.proximal.length, PrototypeArm.distal.length)
+        # print("(", x[0, 0], ", ", x[1, 0], ")")
+        #print("(", i * dT, ", ", q[0], ")")
+        #print("(", i * dT, ", ", q[1], ")")
+    #print(resultant_states)

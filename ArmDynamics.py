@@ -96,7 +96,7 @@ class Arm:
         return qddot
 
 def Prototype() -> Arm:
-    proximal = Joint(mass= 2, length= 1, comdist= 0.5, inertia = 0.5, minangle= 20 * (pi/180), maxangle= 160 * (pi/180), maxtorque = 80)
-    distal = Joint(mass= 1, length= 1, comdist= 0.7, inertia = 0.6, minangle= -240 * (pi/180), maxangle= 60 * (pi/180), maxtorque = 40)
+    proximal = Joint(mass= 2, length= 1, comdist= 0.5, inertia = 0.5, minangle= 20 * (pi/180), maxangle= 160 * (pi/180), maxtorque = 40)
+    distal = Joint(mass= 1, length= 1, comdist= 0.7, inertia = 0.6, minangle= -240 * (pi/180), maxangle= 60 * (pi/180), maxtorque = 20)
     
     return Arm(proximal, distal)

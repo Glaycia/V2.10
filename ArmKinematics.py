@@ -1,8 +1,8 @@
 import numpy as np
  
 def forwardKinematics(q, length_1, length_2):
-    q1 = q[0, 0]
-    q2 = q[1, 0]
+    q1 = q[0]
+    q2 = q[1]
     x = np.empty((2, 1))
     x[0, 0] = np.cos(q1)*length_1+np.cos(q2)*length_2
     x[1, 0] = np.sin(q1)*length_1+np.sin(q2)*length_2
