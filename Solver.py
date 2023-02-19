@@ -2,10 +2,33 @@ from casadi import numpy as np
 from casadi import *
 import casadi
 
+from Spline import *
 import PrintUtil
-from ArmDynamics import Arm, Prototype
+from ArmDynamics import Arm, Prototype, Hogfish
 import ArmKinematics
 from Integration import rk4, euler
+
+def SmoothConstraintRectangle(solver: casadi.Opti, x, y, x0: float, y0: float, x1: float, y1: float, constrained_within: bool):
+    x_center = (x0 + x1)/2
+    y_center = (y0 + y1)/2
+    width = fabs(x0 - x1)  #x
+    height = fabs(y0 - y1) #y
+
+    if constrained_within:
+        f_inside = lambda a, l_b, h_b: -(a - l_b) * (a - h_b)
+
+        f_x = f_inside(x, x_center - width/2, x_center + width/2)
+        f_y = f_inside(y, y_center - height/2, y_center + height/2)
+        solver.subject_to(f_x + f_y > 0)
+    else:
+        f = lambda a, q: (sqrt(a**2 + q) + a - sqrt(q))/2
+        f_outside = lambda a, q, l_b, h_b: -(f(a-h_b, q) * f(-a+l_b, q)) #To make g's derivative 1 at l_b<x<h_b, multiply by 2/sqrt(q)
+
+        #If within, f < 0 and near 0, gets larger the further away from the constraint rectangle
+        rectangle_quality = 0.0001
+        f_x = f_outside(x, rectangle_quality, x_center - width/2, x_center + width/2)
+        f_y = f_outside(y, rectangle_quality, y_center - height/2, y_center + height/2)
+        solver.subject_to(f_x + f_y > 0)
 
 def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, simplified: bool = False, use_rk4: bool = False) -> casadi.Opti:
     solver = casadi.Opti()
@@ -29,10 +52,6 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, simplif
     J2dot_target = qFinal[3, 0]
 
     X = solver.variable(4, N + 1) #Arm State
-    # if simplified == True:
-    #     for k in range(N + 1):
-    #         solver.set_initial(X[0, k], J1_init + k / (N+1) * (J1_target - J1_init))
-    #         solver.set_initial(X[1, k], J2_init + k / (N+1) * (J2_target - J2_init))
     U = solver.variable(2, N) #Torques
     T = solver.variable(1) #Total Time
 
@@ -52,8 +71,14 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, simplif
     solver.subject_to(solver.bounded(J1_min, X[0, :], J1_max))
     solver.subject_to(solver.bounded(J2_min, X[1, :], J2_max))
 
-    for k in range(N + 1): #Do you really need N + 1, N probably just suffices
-        solver.subject_to(sin(X[0, k]) * Arm.proximal.length + sin(X[1, k]) * Arm.distal.length > 0)
+    for k in range(N + 1):
+        x = cos(X[0, k]) * Arm.proximal.length + cos(X[1, k]) * Arm.distal.length
+        y = sin(X[0, k]) * Arm.proximal.length + sin(X[1, k]) * Arm.distal.length
+
+        clearance = 0.127
+        SmoothConstraintRectangle(solver, x, y, x0= 1.7018-clearance, y0= -0.17145 -0.20955 + clearance, x1= -1.7018+clearance, y1=1.9812, constrained_within=True) #Rules Constraint
+        SmoothConstraintRectangle(solver, x, y, x0= 0.8382/2 + clearance, y0= -0.20955 + clearance, x1=-0.8382/2 - clearance, y1=-1, constrained_within=False) #Robot Body
+        # solver.subject_to(y > 0)
     #for k in range(N):
     #    solver.subject_to(CartesianBoundsViolation(X[:, k]))
 
@@ -76,7 +101,64 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, simplif
 
     return solver, X, U, T
 
-def Multisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casadi.Opti:
+def InitialGuessFRC(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, body_height: float):
+    x_init = ArmKinematics.forwardKinematics(qInit[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:]
+    x_final = ArmKinematics.forwardKinematics(qFinal[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:] #Convert it to a vector
+
+    waypoints = [
+        Waypoint(p=x_init,v=np.array([0, 0]), a=np.array([0, 0])),
+        Waypoint(p=x_final,v=np.array([0, 0]), a=np.array([0, 0]))
+    ]
+
+    if x_init[0] * x_final[0] < 0: #If on opposite sides,
+        SwingthruSplineVel = 0.3
+        waypoints.insert(1, Waypoint(p=np.array([0, Arm.proximal.length - Arm.distal.length]),v=np.array([sign(x_final[0]) * SwingthruSplineVel, 0]), a=np.array([0, 0])))
+
+    if x_init[1] < body_height:
+        HeightVelocity = 0.5
+        waypoints.insert(1, Waypoint(p=np.array([x_init[0], body_height]),v=np.array([0, HeightVelocity]), a=np.array([0, 0])))
+
+    if x_final[1] < body_height:
+        HeightVelocity = 0.5
+        waypoints.insert(len(waypoints) - 1, Waypoint(p=np.array([x_final[0], body_height]),v=np.array([0, -HeightVelocity]), a=np.array([0, 0])))
+    
+    path = Spline(waypoints, N + 1)
+    init_guess_points = path.points()
+
+    # for i in range(N + 1):
+    #     print("(", init_guess_points[i][0], ",", init_guess_points[i][1], ")")
+
+    parsable_states = np.zeros((4, N + 1))
+    for i in range(len(init_guess_points)):
+        qpos = ArmKinematics.inverseKinematics(init_guess_points[i], Arm.proximal.length, Arm.distal.length)
+        parsable_states[0, i] = qpos[0]
+        parsable_states[1, i] = qpos[1]
+    
+    # print(parsable_states)
+    return parsable_states
+
+def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casadi.Opti:
+    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, True, False)
+    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, False, True)
+
+    x_init = ArmKinematics.forwardKinematics(qInit[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:]
+    x_final = ArmKinematics.forwardKinematics(qFinal[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:] #Convert it to a vector
+    if x_init[1] < -0.08255 and x_final[1] < -0.08255:
+        solver_1.set_initial(X_1, InitialGuessFRC(Arm, qInit, qFinal, N, -0.08255))
+    solution_1 = solver_1.solve()
+
+    solver_2.set_initial(X_2, solution_1.value(X_1))
+    solver_2.set_initial(U_2, solution_1.value(U_1))
+    solver_2.set_initial(T_2, solution_1.value(T_1))
+
+    solution_2 = solver_2.solve()
+
+    # SolutionDesmos(solution_1, X_1, T_1)
+    SolutionDesmos(solution_2, X_2, T_2)
+
+    return solution_2, X_2, U_2, T_2
+
+def Trisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casadi.Opti:
     solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, True, False)
     solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, False, False)
     solver_3, X_3, U_3, T_3 = DivorcedArm(Arm, qInit, qFinal, N, False, True)
@@ -94,34 +176,68 @@ def Multisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casad
     solver_3.set_initial(T_3, solution_2.value(T_2))
 
     solution_3 = solver_3.solve()
+
+    # SolutionDesmos(solution_1, X_1, T_1)
+    # SolutionDesmos(solution_2, X_2, T_2)
+    SolutionDesmos(solution_3, X_3, T_3)
+
     return solution_3, X_3, U_3, T_3
 
-
-if __name__ == "__main__":
-    N = 25
-    PrototypeArm = Prototype()
-    #print(PrototypeArm.proximal.minangle, PrototypeArm.proximal.maxangle)
-    #print(PrototypeArm.distal.minangle, PrototypeArm.distal.maxangle)
-    qInit = np.zeros((4, 1))
-    qInit[0, 0] = 0.5
-    qInit[1, 0] = -0.3
-    qFinal = np.zeros((4, 1))
-    qFinal[0, 0] = 2
-    qFinal[1, 0] = -pi
-    
-    solution, X, U, T = Multisolve(PrototypeArm, qInit, qFinal, N)
-
+def SolutionDesmos(solution, X, T):
     resultant_states = solution.value(X)
     dT = solution.value(T)/N
 
     for i in range(N + 1):
         q = resultant_states[0:2, i]
-        PrintUtil.printArm(q, PrototypeArm.proximal.length, PrototypeArm.proximal.length, i * dT)
+        PrintUtil.printArm(q, PrototypeArm.proximal.length, PrototypeArm.distal.length, i * dT)
+
+if __name__ == "__main__":
+    N = 50
+    PrototypeArm = Hogfish()
+    #print(PrototypeArm.proximal.minangle, PrototypeArm.proximal.maxangle)
+    #print(PrototypeArm.distal.minangle, PrototypeArm.distal.maxangle)
+    x = np.zeros((2, 1))
+    x[0, 0] = 0.6
+    x[1, 0] = -0.2
+    qIK = ArmKinematics.inverseKinematics(x, PrototypeArm.proximal.length, PrototypeArm.distal.length)
+    x[0, 0] = -0.6
+    x[1, 0] = -0.2
+    qIK2 = ArmKinematics.inverseKinematics(x, PrototypeArm.proximal.length, PrototypeArm.distal.length)
+    xDot = np.zeros((2, 1))
+    xDot[0, 0] = 0
+    xDot[1, 0] = 0
+    qDotIK2 = ArmKinematics.inverseVelocities(qIK2, xDot, PrototypeArm.proximal.length, PrototypeArm.distal.length)
+    print(qIK2[0])
+    print(qIK2[1])
+
+    qInit = np.zeros((4, 1))
+    qInit[0, 0] = qIK[0]
+    qInit[1, 0] = qIK[1]
+    qFinal = np.zeros((4, 1))
+    qFinal[0, 0] = qIK2[0]
+    qFinal[1, 0] = qIK2[1]
+    
+    qFinal[2, 0] = qDotIK2[0]
+    qFinal[3, 0] = qDotIK2[1]
+    
+    solution, X, U, T = Bisolve(PrototypeArm, qInit, qFinal, N)
+
+    resultant_states = solution.value(X)
+    resultant_controls = solution.value(U)
+    dT = solution.value(T)/N
+
+    # for i in range(N + 1):
+    #     q = resultant_states[0:2, i]
+    #     u = resultant_controls[0:2, i]
+    #     PrintUtil.printArm(q, PrototypeArm.proximal.length, PrototypeArm.distal.length, i * dT)
         # j1x = sin(q[0]) * PrototypeArm.proximal.length
-        # j1y = cos(q[1]) * PrototypeArm.proximal.length
+        # j1y = cos(q[1]) * PrototypeArmS.proximal.length
         # print("(", j1x, ", ", j1y, ")")
         # x = ArmKinematics.forwardKinematics(q, PrototypeArm.proximal.length, PrototypeArm.distal.length)
         # print("(", x[0, 0], ", ", x[1, 0], ")")
-        # print("(", i * dT, ", ", q[0], ")")
-        # print("(", i * dT, ", ", q[1], ")")
+        # f_x = fmax(fabs(x[0, 0] - 0) - 6/2, 0)
+        # f_y = fmax(fabs(x[1, 0] - -0.55) - 0.9/2, 0)
+        # print(f_x+f_y)
+        # print("(", i * dT, ", ", u[0], ")")
+        # print("(", i * dT, ", ", u[1], ")")
     #print(resultant_states)

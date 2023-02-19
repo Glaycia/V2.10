@@ -100,3 +100,9 @@ def Prototype() -> Arm:
     distal = Joint(mass= 1, length= 1, comdist= 0.7, inertia = 0.6, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 20)
     
     return Arm(proximal, distal)
+
+def Hogfish() -> Arm:
+    proximal = Joint(mass= 2, length= 1.016, comdist= 0.5, inertia = 0.5, min_angle= 20 * (pi/180), max_angle= 160 * (pi/180), max_torque = 40)
+    distal = Joint(mass= 2, length= 0.8382, comdist= 0.7, inertia = 0.6, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 20)
+    
+    return Arm(proximal, distal)
