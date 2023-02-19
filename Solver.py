@@ -7,30 +7,9 @@ import PrintUtil
 from ArmDynamics import Arm, Prototype, Hogfish
 import ArmKinematics
 from Integration import rk4, euler
+from Constraints import *
 
-def SmoothConstraintRectangle(solver: casadi.Opti, x, y, x0: float, y0: float, x1: float, y1: float, constrained_within: bool):
-    x_center = (x0 + x1)/2
-    y_center = (y0 + y1)/2
-    width = fabs(x0 - x1)  #x
-    height = fabs(y0 - y1) #y
-
-    if constrained_within:
-        f_inside = lambda a, l_b, h_b: -(a - l_b) * (a - h_b)
-
-        f_x = f_inside(x, x_center - width/2, x_center + width/2)
-        f_y = f_inside(y, y_center - height/2, y_center + height/2)
-        solver.subject_to(f_x + f_y > 0)
-    else:
-        f = lambda a, q: (sqrt(a**2 + q) + a - sqrt(q))/2
-        f_outside = lambda a, q, l_b, h_b: -(f(a-h_b, q) * f(-a+l_b, q)) #To make g's derivative 1 at l_b<x<h_b, multiply by 2/sqrt(q)
-
-        #If within, f < 0 and near 0, gets larger the further away from the constraint rectangle
-        rectangle_quality = 0.0001
-        f_x = f_outside(x, rectangle_quality, x_center - width/2, x_center + width/2)
-        f_y = f_outside(y, rectangle_quality, y_center - height/2, y_center + height/2)
-        solver.subject_to(f_x + f_y > 0)
-
-def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, simplified: bool = False, use_rk4: bool = False) -> casadi.Opti:
+def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints, simplified: bool = False, use_rk4: bool = False) -> casadi.Opti:
     solver = casadi.Opti()
     solver.solver('ipopt')
     
@@ -74,13 +53,9 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, simplif
     for k in range(N + 1):
         x = cos(X[0, k]) * Arm.proximal.length + cos(X[1, k]) * Arm.distal.length
         y = sin(X[0, k]) * Arm.proximal.length + sin(X[1, k]) * Arm.distal.length
-
-        clearance = 0.127
-        SmoothConstraintRectangle(solver, x, y, x0= 1.7018-clearance, y0= -0.17145 -0.20955 + clearance, x1= -1.7018+clearance, y1=1.9812, constrained_within=True) #Rules Constraint
-        SmoothConstraintRectangle(solver, x, y, x0= 0.8382/2 + clearance, y0= -0.20955 + clearance, x1=-0.8382/2 - clearance, y1=-1, constrained_within=False) #Robot Body
-        # solver.subject_to(y > 0)
-    #for k in range(N):
-    #    solver.subject_to(CartesianBoundsViolation(X[:, k]))
+        
+        for constraint in constraints:
+            SmoothConstraintRectangle(solver, x, y, constraint)
 
     #Control Constraints
     solver.subject_to(solver.bounded(-u1_max, U[0, :], u1_max))
@@ -137,9 +112,9 @@ def InitialGuessFRC(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, bod
     # print(parsable_states)
     return parsable_states
 
-def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casadi.Opti:
-    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, True, False)
-    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, False, True)
+def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints) -> casadi.Opti:
+    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, constraints, True, False)
+    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, True)
 
     x_init = ArmKinematics.forwardKinematics(qInit[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:]
     x_final = ArmKinematics.forwardKinematics(qFinal[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:] #Convert it to a vector
@@ -158,10 +133,10 @@ def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casadi.O
 
     return solution_2, X_2, U_2, T_2
 
-def Trisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int) -> casadi.Opti:
-    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, True, False)
-    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, False, False)
-    solver_3, X_3, U_3, T_3 = DivorcedArm(Arm, qInit, qFinal, N, False, True)
+def Trisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints) -> casadi.Opti:
+    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, constraints, True, False)
+    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, False)
+    solver_3, X_3, U_3, T_3 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, True)
 
     solution_1 = solver_1.solve()
 
@@ -220,7 +195,11 @@ if __name__ == "__main__":
     qFinal[2, 0] = qDotIK2[0]
     qFinal[3, 0] = qDotIK2[1]
     
-    solution, X, U, T = Bisolve(PrototypeArm, qInit, qFinal, N)
+    clearance = 0.127
+    rule_constraint = ConstraintParameter(x0= 1.7018-clearance, y0= -0.17145 -0.20955 + clearance, x1= -1.7018+clearance, y1=1.9812, constrained_within=True)
+    robot_body = ConstraintParameter(x0= 0.8382/2 + clearance, y0= -0.20955 + clearance, x1=-0.8382/2 - clearance, y1=-1, constrained_within=False)
+
+    solution, X, U, T = Bisolve(PrototypeArm, qInit, qFinal, N, [rule_constraint, robot_body])
 
     resultant_states = solution.value(X)
     resultant_controls = solution.value(U)
@@ -229,7 +208,6 @@ if __name__ == "__main__":
     # for i in range(N + 1):
     #     q = resultant_states[0:2, i]
     #     u = resultant_controls[0:2, i]
-    #     PrintUtil.printArm(q, PrototypeArm.proximal.length, PrototypeArm.distal.length, i * dT)
         # j1x = sin(q[0]) * PrototypeArm.proximal.length
         # j1y = cos(q[1]) * PrototypeArmS.proximal.length
         # print("(", j1x, ", ", j1y, ")")
