@@ -23,7 +23,7 @@ class ArmState:
             x_pos = x[0:2]
             x_vel = x[2:4]
 
-            if not check_valid_state(Arm, x_pos):
+            if check_valid_state(Arm, x_pos):
                 print("Outside of arm bounds, regularizing radially")
 
             q_pos = ArmKinematics.inverseKinematics(x_pos, Arm.proximal.length, Arm.distal.length)
@@ -62,14 +62,16 @@ def solve(Arm: Arm, waypoints: ArmState, Nper: int, constraints):
 
 if __name__ == "__main__":
     Arm = Hogfish()
-    p0 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
-    p1 = ArmState(Arm, np.array([0.2, 1, 0, 2]), is_jointspace=False)
-    p2 = ArmState(Arm, np.array([1, 1, 0, 0]), is_jointspace=False)
+    p0 = ArmState(Arm, np.array([0.7, 1, 0, 0]), is_jointspace=False)
+    p1 = ArmState(Arm, np.array([0.5, 0.7, 0, -1]), is_jointspace=False)
+    p2 = ArmState(Arm, np.array([0.7, 0.4, 1, 0]), is_jointspace=False)
+    p3 = ArmState(Arm, np.array([0.8, 0.7, -1, 1]), is_jointspace=False)
+    p4 = ArmState(Arm, np.array([0.5, 0.7, 0, 0]), is_jointspace=False)
 
     clearance = 0.127
     rule_constraint = ConstraintParameter(x0= 1.7018-clearance, y0= -0.17145 -0.20955 + clearance, x1= -1.7018+clearance, y1=1.9812, constrained_within=True)
     robot_body = ConstraintParameter(x0= 0.8382/2 + clearance, y0= -0.20955 + clearance, x1=-0.8382/2 - clearance, y1=-1, constrained_within=False)
 
-    states, controls, times = solve(Arm, [p0, p1, p2], 30, [rule_constraint, robot_body])
+    states, controls, times = solve(Arm, [p0, p1, p2, p3, p4], 20, [rule_constraint, robot_body])
 
-    TrajectoryWriter.write_trajectory("Default_To_Shelf", p0.q, p2.q, states, controls, times)
+    #TrajectoryWriter.write_trajectory("Draw_6", p0.q, p2.q, states, controls, times)
