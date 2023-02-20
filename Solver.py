@@ -129,7 +129,7 @@ def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints
     solution_2 = solver_2.solve()
 
     # SolutionDesmos(solution_1, X_1, T_1)
-    SolutionDesmos(solution_2, X_2, T_2)
+    # SolutionDesmos(Arm, solution_2, X_2, T_2)
 
     return solution_2, X_2, U_2, T_2
 
@@ -154,17 +154,20 @@ def Trisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraint
 
     # SolutionDesmos(solution_1, X_1, T_1)
     # SolutionDesmos(solution_2, X_2, T_2)
-    SolutionDesmos(solution_3, X_3, T_3)
+    # SolutionDesmos(Arm, solution_3, X_3, T_3)
 
     return solution_3, X_3, U_3, T_3
 
-def SolutionDesmos(solution, X, T):
+def SolutionDesmos(Arm: Arm, solution, X, T, T_offset = 0):
     resultant_states = solution.value(X)
+    N = X.size2() - 1
     dT = solution.value(T)/N
 
     for i in range(N + 1):
         q = resultant_states[0:2, i]
-        PrintUtil.printArm(q, PrototypeArm.proximal.length, PrototypeArm.distal.length, i * dT)
+        PrintUtil.printArm(q, Arm.proximal.length, Arm.distal.length, i * dT + T_offset)
+
+
 
 if __name__ == "__main__":
     N = 50
@@ -204,18 +207,7 @@ if __name__ == "__main__":
     resultant_states = solution.value(X)
     resultant_controls = solution.value(U)
     dT = solution.value(T)/N
-
-    # for i in range(N + 1):
-    #     q = resultant_states[0:2, i]
-    #     u = resultant_controls[0:2, i]
-        # j1x = sin(q[0]) * PrototypeArm.proximal.length
-        # j1y = cos(q[1]) * PrototypeArmS.proximal.length
-        # print("(", j1x, ", ", j1y, ")")
-        # x = ArmKinematics.forwardKinematics(q, PrototypeArm.proximal.length, PrototypeArm.distal.length)
-        # print("(", x[0, 0], ", ", x[1, 0], ")")
-        # f_x = fmax(fabs(x[0, 0] - 0) - 6/2, 0)
-        # f_y = fmax(fabs(x[1, 0] - -0.55) - 0.9/2, 0)
-        # print(f_x+f_y)
-        # print("(", i * dT, ", ", u[0], ")")
-        # print("(", i * dT, ", ", u[1], ")")
-    #print(resultant_states)
+    
+    SolutionDesmos(Arm, solution, X, T)
+    
+    #print(resultant_states.shape)

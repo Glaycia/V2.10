@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from casadi import numpy as np
+from casadi import *
+import casadi
 
 @dataclass
 class ConstraintParameter:
@@ -8,11 +11,7 @@ class ConstraintParameter:
     y1: float
     constrained_within: bool
 
-from casadi import numpy as np
-from casadi import *
-import casadi
 
-#Works Best
 def SmoothConstraintRectangle(solver: casadi.Opti, x, y, params: ConstraintParameter):
     x_center = (params.x0 + params.x1)/2
     y_center = (params.y0 + params.y1)/2
@@ -34,3 +33,15 @@ def SmoothConstraintRectangle(solver: casadi.Opti, x, y, params: ConstraintParam
         f_x = f_outside(x, rectangle_quality, x_center - width/2, x_center + width/2)
         f_y = f_outside(y, rectangle_quality, y_center - height/2, y_center + height/2)
         solver.subject_to(f_x + f_y > 0)
+
+def within_constraint(x, y, constraint: ConstraintParameter) -> bool:
+    bigger_xconstraint = constraint.x0 if constraint.x0 > constraint.x1 else constraint.x1
+    smaller_xconstraint = constraint.x0 if constraint.x0 < constraint.x1 else constraint.x1
+
+    bigger_yconstraint = constraint.y0 if constraint.y0 > constraint.y1 else constraint.y1
+    smaller_yconstraint = constraint.y0 if constraint.y0 < constraint.y1 else constraint.y1
+
+    if constraint.constrained_within:
+        return smaller_xconstraint < x < bigger_xconstraint and smaller_yconstraint < y < bigger_yconstraint
+    else:
+        return not(smaller_xconstraint < x < bigger_xconstraint) or not(smaller_yconstraint < y < bigger_yconstraint)
