@@ -9,9 +9,14 @@ import ArmKinematics
 from Integration import rk4, euler
 from Constraints import *
 
-def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints, simplified: bool = False, use_rk4: bool = False) -> casadi.Opti:
+def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints, simplified: bool, use_rk4: bool, text_output: bool = True) -> casadi.Opti:
     solver = casadi.Opti()
     solver.solver('ipopt')
+
+    if not text_output:
+        p_opts = dict(print_time=True, verbose=False)
+        s_opts = dict(print_level=0)
+        solver.solver("ipopt", p_opts, s_opts)
     
     u1_max = Arm.proximal.max_torque
     u2_max = Arm.distal.max_torque
@@ -112,9 +117,9 @@ def InitialGuessFRC(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, bod
     # print(parsable_states)
     return parsable_states
 
-def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints) -> casadi.Opti:
-    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, constraints, True, False)
-    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, True)
+def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints, text_output: bool = True) -> casadi.Opti:
+    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, constraints, True, False, text_output)
+    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, True, text_output)
 
     x_init = ArmKinematics.forwardKinematics(qInit[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:]
     x_final = ArmKinematics.forwardKinematics(qFinal[0:2, 0], Arm.proximal.length, Arm.distal.length)[0:2, 0].T[:] #Convert it to a vector
@@ -133,10 +138,10 @@ def Bisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints
 
     return solution_2, X_2, U_2, T_2
 
-def Trisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints) -> casadi.Opti:
-    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, constraints, True, False)
-    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, False)
-    solver_3, X_3, U_3, T_3 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, True)
+def Trisolve(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constraints, text_output: bool = True) -> casadi.Opti:
+    solver_1, X_1, U_1, T_1 = DivorcedArm(Arm, qInit, qFinal, N, constraints, True, False, text_output)
+    solver_2, X_2, U_2, T_2 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, False, text_output)
+    solver_3, X_3, U_3, T_3 = DivorcedArm(Arm, qInit, qFinal, N, constraints, False, True, text_output)
 
     solution_1 = solver_1.solve()
 

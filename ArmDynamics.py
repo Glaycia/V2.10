@@ -96,13 +96,21 @@ class Arm:
         return qddot
 
 def Prototype() -> Arm:
-    proximal = Joint(mass= 2, length= 1, comdist= 0.5, inertia = 0.5, min_angle= 20 * (pi/180), max_angle= 160 * (pi/180), max_torque = 40)
-    distal = Joint(mass= 1, length= 1, comdist= 0.7, inertia = 0.6, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 20)
+    pounds_to_kilograms = 0.453592
+    inches_to_meters = 0.0254
+    lbs_sqinches_to_kg_sqmeters = pounds_to_kilograms * inches_to_meters ** 2
+
+    proximal = Joint(mass= 1.6 * pounds_to_kilograms, length= 17.5 * inches_to_meters, comdist= 9.88 * inches_to_meters, inertia = 236.59 * lbs_sqinches_to_kg_sqmeters, min_angle= 20 * (pi/180), max_angle= 160 * (pi/180), max_torque = 30)
+    distal = Joint(mass= 0.88 * pounds_to_kilograms, length= 14.5 * inches_to_meters, comdist= 2.15 * inches_to_meters, inertia = 25.01 * lbs_sqinches_to_kg_sqmeters, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 15)
     
     return Arm(proximal, distal)
 
 def Hogfish() -> Arm:
-    proximal = Joint(mass= 2, length= 1.016, comdist= 0.5, inertia = 0.5, min_angle= 20 * (pi/180), max_angle= 160 * (pi/180), max_torque = 40)
-    distal = Joint(mass= 2, length= 0.8382, comdist= 0.7, inertia = 0.6, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 20)
+    pounds_to_kilograms = 0.453592
+    inches_to_meters = 0.0254
+    lbs_sqinches_to_kg_sqmeters = pounds_to_kilograms * inches_to_meters ** 2
+
+    proximal = Joint(mass= 4*2*pounds_to_kilograms, length= 40*inches_to_meters, comdist= 22.8*inches_to_meters, inertia = 2*2961.95 * lbs_sqinches_to_kg_sqmeters, min_angle= 20 * (pi/180), max_angle= 160 * (pi/180), max_torque = 80)
+    distal = Joint(mass= 2.7*2*pounds_to_kilograms, length= 33*inches_to_meters, comdist= 13.56*inches_to_meters, inertia = 2*866.84 * lbs_sqinches_to_kg_sqmeters, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 60)
     
     return Arm(proximal, distal)

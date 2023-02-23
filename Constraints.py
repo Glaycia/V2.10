@@ -23,7 +23,8 @@ def SmoothConstraintRectangle(solver: casadi.Opti, x, y, params: ConstraintParam
 
         f_x = f_inside(x, x_center - width/2, x_center + width/2)
         f_y = f_inside(y, y_center - height/2, y_center + height/2)
-        solver.subject_to(f_x + f_y > 0)
+        solver.subject_to(f_x > 0)
+        solver.subject_to(f_y > 0)
     else:
         f = lambda a, q: (sqrt(a**2 + q) + a - sqrt(q))/2
         f_outside = lambda a, q, l_b, h_b: -(f(a-h_b, q) * f(-a+l_b, q)) #To make g's derivative 1 at l_b<x<h_b, multiply by 2/sqrt(q)

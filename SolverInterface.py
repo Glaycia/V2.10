@@ -1,4 +1,4 @@
-from ArmDynamics import Arm, Hogfish
+from ArmDynamics import Arm, Hogfish, Prototype
 from Constraints import *
 import ArmKinematics
 import numpy as np
@@ -43,7 +43,7 @@ def solve(Arm: Arm, waypoints: ArmState, Nper: int, constraints):
     list_of_controls = []
     list_of_time = [0]
     for i in range(len(waypoints) - 1):
-        solution, X, U, T = Bisolve(Arm, waypoints[i].as2D(), waypoints[i + 1].as2D(), Nper, constraints)
+        solution, X, U, T = Bisolve(Arm, waypoints[i].as2D(), waypoints[i + 1].as2D(), Nper, constraints, text_output= False)
 
         SolutionDesmos(Arm, solution, X, T, T_offset= list_of_time[len(list_of_time) - 1])
 
@@ -55,23 +55,28 @@ def solve(Arm: Arm, waypoints: ArmState, Nper: int, constraints):
             list_of_controls.append(control_array[0:2, j])
             list_of_time.append(list_of_time[len(list_of_time) - 1] + segment_duration/Nper)
         if i == len(waypoints) - 2:
-            list_of_states.append(waypoints[i + 1].as2D())
+            list_of_states.append(waypoints[i + 1].q)
 
     return list_of_states, list_of_controls, list_of_time
 
 
 if __name__ == "__main__":
     Arm = Hogfish()
-    p0 = ArmState(Arm, np.array([0.7, 1, 0, 0]), is_jointspace=False)
-    p1 = ArmState(Arm, np.array([0.5, 0.7, 0, -1]), is_jointspace=False)
-    p2 = ArmState(Arm, np.array([0.7, 0.4, 1, 0]), is_jointspace=False)
-    p3 = ArmState(Arm, np.array([0.8, 0.7, -1, 1]), is_jointspace=False)
-    p4 = ArmState(Arm, np.array([0.5, 0.7, 0, 0]), is_jointspace=False)
+    p0 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
+    p1 = ArmState(Arm, np.array([1.0, 0.5, 4.6, 4.6]), is_jointspace=False)
+    p2 = ArmState(Arm, np.array([-1.5, -0.2, 0, 0]), is_jointspace=False)
 
     clearance = 0.127
     rule_constraint = ConstraintParameter(x0= 1.7018-clearance, y0= -0.17145 -0.20955 + clearance, x1= -1.7018+clearance, y1=1.9812, constrained_within=True)
     robot_body = ConstraintParameter(x0= 0.8382/2 + clearance, y0= -0.20955 + clearance, x1=-0.8382/2 - clearance, y1=-1, constrained_within=False)
 
-    states, controls, times = solve(Arm, [p0, p1, p2, p3, p4], 20, [rule_constraint, robot_body])
+    states, controls, times = solve(Arm, [p0, p1, p2], 40, [rule_constraint, robot_body])
 
-    #TrajectoryWriter.write_trajectory("Draw_6", p0.q, p2.q, states, controls, times)
+    # for i in range(len(times)):
+    #     print("(", times[i], ",", states[i][2], ")")
+    #     print("(", times[i], ",", states[i][3], ")")
+    #     print("m")
+    #     print("m")
+    #     print("m")
+
+    # TrajectoryWriter.write_trajectory("ThrowCube_Max_", p0.q, p2.q, states, controls, times)
