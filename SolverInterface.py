@@ -1,6 +1,6 @@
 from ArmDynamics import Arm, Hogfish, Prototype
 from Constraints import *
-import ArmKinematics
+import ArmKinematics, Constraints
 import numpy as np
 from Solver import Bisolve, SolutionDesmos
 
@@ -62,15 +62,18 @@ def solve(Arm: Arm, waypoints: ArmState, Nper: int, constraints):
 
 if __name__ == "__main__":
     Arm = Hogfish()
+
+    inches_to_meters = 0.0254
+
     p0 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
-    p1 = ArmState(Arm, np.array([1.0, 0.5, 4.6, 4.6]), is_jointspace=False)
+    p1 = ArmState(Arm, np.array([3 * inches_to_meters, 17 * inches_to_meters, 0, 1]), is_jointspace=False)
     p2 = ArmState(Arm, np.array([-1.5, -0.2, 0, 0]), is_jointspace=False)
 
-    clearance = 0.127
-    rule_constraint = ConstraintParameter(x0= 1.7018-clearance, y0= -0.17145 -0.20955 + clearance, x1= -1.7018+clearance, y1=1.9812, constrained_within=True)
-    robot_body = ConstraintParameter(x0= 0.8382/2 + clearance, y0= -0.20955 + clearance, x1=-0.8382/2 - clearance, y1=-1, constrained_within=False)
+    Hogfish_Constraints = Constraints.Hogfish_Constraints()
+    Prototype_Constraints = Constraints.Prototype_Constraints()
+    
 
-    states, controls, times = solve(Arm, [p0, p1, p2], 40, [rule_constraint, robot_body])
+    states, controls, times = solve(Arm, [p0, p1, p2], 40, Prototype_Constraints)
 
     # for i in range(len(times)):
     #     print("(", times[i], ",", states[i][2], ")")

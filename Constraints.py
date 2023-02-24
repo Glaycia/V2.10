@@ -46,3 +46,14 @@ def within_constraint(x, y, constraint: ConstraintParameter) -> bool:
         return smaller_xconstraint < x < bigger_xconstraint and smaller_yconstraint < y < bigger_yconstraint
     else:
         return not(smaller_xconstraint < x < bigger_xconstraint) or not(smaller_yconstraint < y < bigger_yconstraint)
+    
+def Hogfish_Constraints():
+    clearance = 0.127
+    rule_constraint = ConstraintParameter(x0= 1.7018-clearance, y0= -0.17145 -0.20955 + clearance, x1= -1.7018+clearance, y1=1.9812, constrained_within=True)
+    robot_body = ConstraintParameter(x0= 0.8382/2 + clearance, y0= -0.20955 + clearance, x1=-0.8382/2 - clearance, y1=-1, constrained_within=False)
+    return [rule_constraint, robot_body]
+
+def Prototype_Constraints():
+    inches_to_meters = 0.0254
+    robot_body = ConstraintParameter(x0= -15 * inches_to_meters, y0= 1 * inches_to_meters, x1= 15 * inches_to_meters, y1=-1, constrained_within=False)
+    return [robot_body]
