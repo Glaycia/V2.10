@@ -110,7 +110,7 @@ def Hogfish() -> Arm:
     inches_to_meters = 0.0254
     lbs_sqinches_to_kg_sqmeters = pounds_to_kilograms * inches_to_meters ** 2
 
-    proximal = Joint(mass= 4*2*pounds_to_kilograms, length= 40*inches_to_meters, comdist= 22.8*inches_to_meters, inertia = 2*2961.95 * lbs_sqinches_to_kg_sqmeters, min_angle= 20 * (pi/180), max_angle= 160 * (pi/180), max_torque = 80)
-    distal = Joint(mass= 2.7*2*pounds_to_kilograms, length= 33*inches_to_meters, comdist= 13.56*inches_to_meters, inertia = 2*866.84 * lbs_sqinches_to_kg_sqmeters, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 60)
+    proximal = Joint(mass= 4*2*pounds_to_kilograms, length= 40*inches_to_meters, comdist= 22.8*inches_to_meters, inertia = 2*2961.95 * lbs_sqinches_to_kg_sqmeters, min_angle= 20 * (pi/180), max_angle= 160 * (pi/180), max_torque = 120)
+    distal = Joint(mass= 2.7*2*pounds_to_kilograms, length= 33*inches_to_meters, comdist= 13.56*inches_to_meters, inertia = 2*866.84 * lbs_sqinches_to_kg_sqmeters, min_angle= -240 * (pi/180), max_angle= 60 * (pi/180), max_torque = 80)
     
     return Arm(proximal, distal)

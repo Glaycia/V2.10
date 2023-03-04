@@ -4,7 +4,7 @@ import ArmKinematics, Constraints
 import numpy as np
 from Solver import Bisolve, SolutionDesmos
 
-import TrajectoryWriter
+import TrajectoryWriter, JavaWriter
 
 def check_valid_state(Arm, X):
     x = X[0]
@@ -60,26 +60,40 @@ def solve(Arm: Arm, waypoints: ArmState, Nper: int, constraints):
     return list_of_states, list_of_controls, list_of_time
 
 
+def scoring_waypoints():
+    p0 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
+    p1 = ArmState(Arm, np.array([1.3, 1.1, 1, 0]), is_jointspace=False)
+    p2 = ArmState(Arm, np.array([(40 + (3 + 13)) * inches_to_meters, 46 * inches_to_meters - howfararmjointofffloor, -0.5, -1]), is_jointspace=False)
+    p3 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
+    return [p0, p1, p2, p3]
+def scoring_constraint():
+    return ConstraintParameter(x0 = (16 + (3 + 13) + 5) * inches_to_meters, y0 = -1, x1 = (70 + (3 + 13) + 5) * inches_to_meters, y1 = (36+5) * inches_to_meters - howfararmjointofffloor, constrained_within= False)
 if __name__ == "__main__":
     Arm = Hogfish()
 
     inches_to_meters = 0.0254
 
+    howfararmjointofffloor = 8.25 * inches_to_meters
+
     p0 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
-    p1 = ArmState(Arm, np.array([3 * inches_to_meters, 17 * inches_to_meters, 0, 1]), is_jointspace=False)
+    p1 = ArmState(Arm, np.array([1, 0.5, 4.5, 4.5]), is_jointspace=False)
     p2 = ArmState(Arm, np.array([-1.5, -0.2, 0, 0]), is_jointspace=False)
 
     Hogfish_Constraints = Constraints.Hogfish_Constraints()
     Prototype_Constraints = Constraints.Prototype_Constraints()
-    
 
-    states, controls, times = solve(Arm, [p0, p1, p2], 40, Prototype_Constraints)
+    Hogfish_ScoringConstraint = scoring_constraint()
+    
+    #Hogfish_Constraints.append(Hogfish_ScoringConstraint)
+
+    states, controls, times = solve(Arm, [p0, p1, p0], 50, Hogfish_Constraints)
 
     # for i in range(len(times)):
-    #     print("(", times[i], ",", states[i][2], ")")
-    #     print("(", times[i], ",", states[i][3], ")")
+    #     print("(", times[i] + 6, ",", controls[i][0]/100, ")")
+    #     print("(", times[i] + 6, ",", controls[i][1]/100, ")")
     #     print("m")
     #     print("m")
     #     print("m")
 
-    # TrajectoryWriter.write_trajectory("ThrowCube_Max_", p0.q, p2.q, states, controls, times)
+    #JavaWriter.write_trajectory("ScoreMotion", p0.q, p3.q, states, controls, times)
+    #TrajectoryWriter.write_trajectory("PrototypeSwingup", p0.q, p2.q, states, controls, times)

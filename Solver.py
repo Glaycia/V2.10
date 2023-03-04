@@ -62,6 +62,15 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constra
         for constraint in constraints:
             SmoothConstraintRectangle(solver, x, y, constraint)
 
+    for k in range(N):
+        x0 = cos(X[0, k]) * Arm.proximal.length + cos(X[1, k]) * Arm.distal.length
+        y0 = sin(X[0, k]) * Arm.proximal.length + sin(X[1, k]) * Arm.distal.length
+        x1 = cos(X[0, k + 1]) * Arm.proximal.length + cos(X[1, k + 1]) * Arm.distal.length
+        y1 = sin(X[0, k + 1]) * Arm.proximal.length + sin(X[1, k + 1]) * Arm.distal.length
+        
+        for constraint in constraints:
+            SmoothConstraintRectangle(solver, (x0+x1)/2, (y0+y1)/2, constraint)
+
     #Control Constraints
     solver.subject_to(solver.bounded(-u1_max, U[0, :], u1_max))
     solver.subject_to(solver.bounded(-u2_max, U[1, :], u2_max))
