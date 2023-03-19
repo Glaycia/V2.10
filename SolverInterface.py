@@ -67,6 +67,7 @@ def scoring_waypoints():
     p3 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
     return [p0, p1, p2, p3]
 def scoring_constraint():
+
     return ConstraintParameter(x0 = (16 + (3 + 13) + 5) * inches_to_meters, y0 = -1, x1 = (70 + (3 + 13) + 5) * inches_to_meters, y1 = (36+5) * inches_to_meters - howfararmjointofffloor, constrained_within= False)
 if __name__ == "__main__":
     Arm = Hogfish()
@@ -75,25 +76,30 @@ if __name__ == "__main__":
 
     howfararmjointofffloor = 8.25 * inches_to_meters
 
+    # p0 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
+    # p1 = ArmState(Arm, np.array([1, 0.5, 4.5, 4.5]), is_jointspace=False)
+    # p2 = ArmState(Arm, np.array([-1.5, -0.2, 0, 0]), is_jointspace=False)
+
     p0 = ArmState(Arm, np.array([np.pi/2, -np.pi/2, 0, 0]), is_jointspace=True)
-    p1 = ArmState(Arm, np.array([1, 0.5, 4.5, 4.5]), is_jointspace=False)
+    p1 = ArmState(Arm, np.array([1.4234, 0.9588, -0.25, 0]), is_jointspace=False)
     p2 = ArmState(Arm, np.array([-1.5, -0.2, 0, 0]), is_jointspace=False)
+
 
     Hogfish_Constraints = Constraints.Hogfish_Constraints()
     Prototype_Constraints = Constraints.Prototype_Constraints()
 
     Hogfish_ScoringConstraint = scoring_constraint()
     
-    #Hogfish_Constraints.append(Hogfish_ScoringConstraint)
+    Hogfish_Constraints.append(Hogfish_ScoringConstraint)
 
     states, controls, times = solve(Arm, [p0, p1, p0], 50, Hogfish_Constraints)
 
-    # for i in range(len(times)):
-    #     print("(", times[i] + 6, ",", controls[i][0]/100, ")")
-    #     print("(", times[i] + 6, ",", controls[i][1]/100, ")")
-    #     print("m")
-    #     print("m")
-    #     print("m")
+    for i in range(len(times)):
+        print("(", times[i] + 6, ",", controls[i][0]/100, ")")
+        print("(", times[i] + 6, ",", controls[i][1]/100, ")")
+        print("m")
+        print("m")
+        print("m")
 
     #JavaWriter.write_trajectory("ScoreMotion", p0.q, p3.q, states, controls, times)
     #TrajectoryWriter.write_trajectory("PrototypeSwingup", p0.q, p2.q, states, controls, times)

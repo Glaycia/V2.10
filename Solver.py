@@ -85,8 +85,20 @@ def DivorcedArm(Arm: Arm, qInit: np.ndarray, qFinal: np.ndarray, N: int, constra
             solver.subject_to(X[:, k+1] == euler(Arm.ArmDynamics, X[:, k], U[:, k], dT)) #Dynamics
         else:
             solver.subject_to(X[:, k+1] == rk4(Arm.ArmDynamics, X[:, k], U[:, k], dT)) #Dynamics
-    #Minimize time
-    solver.minimize(T)
+    #Minimize time, and some controls
+
+    J = 0
+    J += T
+
+    for k in range(N):
+        J += (U[0, k] * dT / u1_max)**2 * 2
+        J += (U[1, k] * dT / u2_max)**2 * 1
+
+        if(k != N - 1):
+            J += ((U[0, k + 1] - U[0, k]) * dT / u1_max)**2 * 150
+            J += ((U[1, k + 1] - U[1, k]) * dT / u2_max)**2 * 20
+
+    solver.minimize(J)
 
     return solver, X, U, T
 
